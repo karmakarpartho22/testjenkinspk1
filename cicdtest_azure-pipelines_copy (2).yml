@@ -1,0 +1,183 @@
+trigger:
+- '2101'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- name: Application
+  value: 'CompleoBatchManager'
+- name: devWebApp
+  value: 'compleobatchmanager$(Build.SourceBranchName)-dev-westeurope-webapp'
+- name: tstWebAppIN
+  value: 'compleobatchmanager$(Build.SourceBranchName)-tst-cin'
+- name: tstWebAppEU
+  value: 'compleobatchmanager$(Build.SourceBranchName)-tst-weu'
+- name: prdWebApp01IN
+  value: 'compleobatchmanager$(Build.SourceBranchName)-prd-centralindia-webapp'
+- name: prdWebApp02IN
+  value: 'compleobatchmanager$(Build.SourceBranchName)-prd-westindia-webapp'
+- name: prdWebApp01EU
+  value: 'compleobatchmanager$(Build.SourceBranchName)-prd-weu'
+- name: prdWebApp02EU
+  value: 'compleobatchmanager$(Build.SourceBranchName)-prd-eus'
+
+stages:
+- stage: 'zip'
+  displayName: 'Push ZIP'
+  jobs:
+    - job: 'Copy'
+      steps:
+      - task: CopyFiles@2
+        inputs:
+          Contents: 'publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)'
+      - publish: '$(Build.ArtifactStagingDirectory)'
+        artifact: '$(Application)'
+
+# Need to use "AzureRmWebAppDeployment@4" as CompleoGateway needs write access to wwwroot..
+- stage: 'DEV'
+  displayName: 'Deploy to DEV'
+  jobs:
+  - deployment: Deploy
+    environment: DEV
+    strategy: 
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(Application)'
+          - task: AzureRmWebAppDeployment@4
+            displayName: 'Deploy to DEV'
+            inputs:
+              azureSubscription: 'SymtraxParthoMPN'
+              WebAppName: '$(devWebApp)'
+              packageForLinux: '$(Pipeline.Workspace)/$(Application)/publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+              enableCustomDeployment: true
+              DeploymentType: 'zipDeploy'
+
+- stage: 'TST_IN'
+  displayName: 'Deploy to TST IN'
+  dependsOn: 'DEV'
+  jobs:
+  - deployment: Deploy
+    environment: TST
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(Application)'
+          - task: AzureRmWebAppDeployment@4
+            displayName: 'Deploy to TST IN'
+            inputs:
+              azureSubscription: 'SymtraxParthoMPN'
+              WebAppName: '$(tstWebAppIN)'
+              packageForLinux: '$(Pipeline.Workspace)/$(Application)/publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+              enableCustomDeployment: true
+              DeploymentType: 'zipDeploy'
+
+- stage: 'TST_EU'
+  displayName: 'Deploy to TST EU'
+  dependsOn: 'DEV'
+  jobs:
+  - deployment: Deploy
+    environment: TST
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(Application)'
+          - task: AzureRmWebAppDeployment@4
+            displayName: 'Deploy to TST EU'
+            inputs:
+              azureSubscription: 'SymtraxParthoMPN'
+              WebAppName: '$(tstWebAppEU)'
+              packageForLinux: '$(Pipeline.Workspace)/$(Application)/publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+              enableCustomDeployment: true
+              DeploymentType: 'zipDeploy'
+
+- stage: 'PRD_IN_1'
+  displayName: 'Deploy to PRD IN CIN'
+  dependsOn: 'TST_IN'
+  jobs:
+  - deployment: Deploy
+    environment: PRD
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(Application)'
+          - task: AzureRmWebAppDeployment@4
+            displayName: 'Deploy to PRD 01 IN'
+            inputs:
+              azureSubscription: 'SymtraxParthoMPN'
+              WebAppName: '$(prdWebApp01IN)'
+              packageForLinux: '$(Pipeline.Workspace)/$(Application)/publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+              enableCustomDeployment: true
+              DeploymentType: 'zipDeploy'
+
+- stage: 'PRD_IN_2'
+  displayName: 'Deploy to PRD IN WIN'
+  dependsOn: 'TST_IN'
+  jobs:
+  - deployment: Deploy
+    environment: PRD
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(Application)'
+          - task: AzureRmWebAppDeployment@4
+            displayName: 'Deploy to PRD 02 IN'
+            inputs:
+              azureSubscription: 'SymtraxParthoMPN'
+              WebAppName: '$(prdWebApp02IN)'
+              packageForLinux: '$(Pipeline.Workspace)/$(Application)/publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+              enableCustomDeployment: true
+              DeploymentType: 'zipDeploy'
+
+- stage: 'PRD_EU_1'
+  displayName: 'Deploy to PRD EU WEU'
+  dependsOn: 'TST_EU'
+  jobs:
+  - deployment: Deploy
+    environment: PRD
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(Application)'
+          - task: AzureRmWebAppDeployment@4
+            displayName: 'Deploy to PRD 01 EU'
+            inputs:
+              azureSubscription: 'SymtraxParthoMPN'
+              WebAppName: '$(prdWebApp01EU)'
+              packageForLinux: '$(Pipeline.Workspace)/$(Application)/publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+              enableCustomDeployment: true
+              DeploymentType: 'zipDeploy'
+
+- stage: 'PRD_EU_2'
+  displayName: 'Deploy to PRD EU EUS'
+  dependsOn: 'TST_EU'
+  jobs:
+  - deployment: Deploy
+    environment: PRD
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(Application)'
+          - task: AzureRmWebAppDeployment@4
+            displayName: 'Deploy to PRD 02 EU'
+            inputs:
+              azureSubscription: 'SymtraxParthoMPN'
+              WebAppName: '$(prdWebApp02EU)'
+              packageForLinux: '$(Pipeline.Workspace)/$(Application)/publish/$(Application)$(Build.SourceBranchName)-publish.zip'
+              enableCustomDeployment: true
+              DeploymentType: 'zipDeploy'
